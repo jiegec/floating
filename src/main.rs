@@ -1,9 +1,118 @@
 use anyhow;
+use num_bigint::{BigUint, ToBigUint};
 use std::env::args;
 
+trait FloatType {
+    const EXP: usize;
+    const SIG: usize;
+    const WIDTH: usize = Self::EXP + Self::SIG;
+    fn to_bits(self) -> BigUint;
+}
+
+impl FloatType for f32 {
+    const EXP: usize = 8;
+    const SIG: usize = 24;
+    fn to_bits(self) -> BigUint {
+        self.to_bits().to_biguint().unwrap()
+    }
+}
+
+impl FloatType for f64 {
+    const EXP: usize = 11;
+    const SIG: usize = 53;
+    fn to_bits(self) -> BigUint {
+        self.to_bits().to_biguint().unwrap()
+    }
+}
+
+fn range<T: FloatType>(num: &BigUint, upper: usize, lower: usize) -> BigUint {
+    assert!(upper >= lower);
+    assert!(T::WIDTH > upper);
+    (num >> lower) & ((1 << (upper - lower + 1)) - 1).to_biguint().unwrap()
+}
+
+fn bit<T: FloatType>(num: &BigUint, idx: usize) -> BigUint {
+    (num >> idx) & 1.to_biguint().unwrap()
+}
+
+fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
+    let f0: BigUint = 0.to_biguint().unwrap();
+    // http://www.jhauser.us/arithmetic/HardFloat-1/doc/HardFloat-Verilog.html
+    // recFNFromFN
+    // float32: 1+8+23
+    // hardfloat32: 1+9+23
+    // EXP=8, SIG=24
+    // k=EXP-1=7
+    let sign = bit::<T>(num, T::EXP + T::SIG - 1);
+    let exp_in = range::<T>(num, T::EXP + T::SIG - 2, T::SIG - 1);
+    let sig_in = range::<T>(num, T::SIG - 2, 0);
+
+    let is_zero_exp_in = exp_in == 0.to_biguint().unwrap();
+    let is_zero_sig_in = sig_in == 0.to_biguint().unwrap();
+
+    let k = T::EXP - 1;
+    let pow2k = (1 << k).to_biguint().unwrap();
+    let (exp, sig) = if is_zero_exp_in && is_zero_sig_in {
+        // zeros
+        (f0.clone(), f0.clone())
+    } else if is_zero_exp_in && !is_zero_sig_in {
+        let mut leading_zeros = 0u32;
+        for bit in (0..T::SIG-1).rev() {
+            if sig_in.bit(bit as u64) {
+                break;
+            } else {
+                leading_zeros += 1;
+            }
+        }
+        let n = leading_zeros;
+        let exp = pow2k + 2u32 - n;
+        let sig = sig_in << n;
+        (exp, sig)
+    } else if exp_in == ((1 << (T::EXP + 1)) - 1).to_biguint().unwrap() {
+        // special
+        if is_zero_sig_in {
+            // infinity
+            (0b110.to_biguint().unwrap() << (T::EXP - 3), f0)
+        } else {
+            // NaN
+            (0b111.to_biguint().unwrap() << (T::EXP - 3), f0)
+        }
+    } else {
+        // normal
+        let exp = exp_in + pow2k + 1u32;
+        (exp, sig_in)
+    };
+    (sign << (T::EXP + T::SIG)) | (exp << (T::SIG - 1)) | sig
+}
+
+fn print_float<T: FloatType>(bits: &BigUint) -> String {
+    let sign = bit::<T>(bits, T::SIG + T::EXP - 1);
+    let exp = range::<T>(bits, T::SIG + T::EXP - 2, T::SIG - 1);
+    let sig = range::<T>(bits, T::SIG - 2, 0);
+    format!("sign={},exp={},sig={}", sign, exp, sig)
+}
+
+fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
+    let sign = bit::<T>(bits, T::SIG + T::EXP);
+    let exp = range::<T>(bits, T::SIG + T::EXP - 1, T::SIG - 1);
+    let sig = range::<T>(bits, T::SIG - 2, 0);
+    format!("sign={},exp={},sig={}", sign, exp, sig)
+}
+
 fn float_to_hex(num: f64) {
+    let b32 = (num as f32).to_bits().to_biguint().unwrap();
+    let hf32 = to_hardfloat::<f32>(&b32);
     println!("  float -> hex:");
-    println!("    f32: {:#x}", (num as f32).to_bits());
+    println!(
+        "    f32: {:#x}({})",
+        (num as f32).to_bits(),
+        print_float::<f32>(&b32)
+    );
+    println!(
+        "    hf32: {:#x}({})",
+        hf32,
+        print_hardfloat::<f32>(&hf32)
+    );
     println!("    f64: {:#x}", (num).to_bits());
 }
 
