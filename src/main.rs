@@ -6,12 +6,14 @@ trait FloatType {
     const EXP: usize;
     const SIG: usize;
     const WIDTH: usize = Self::EXP + Self::SIG;
+    const NAME: &'static str;
     fn to_bits(self) -> BigUint;
 }
 
 impl FloatType for f32 {
     const EXP: usize = 8;
     const SIG: usize = 24;
+    const NAME: &'static str = "f32";
     fn to_bits(self) -> BigUint {
         self.to_bits().to_biguint().unwrap()
     }
@@ -20,6 +22,7 @@ impl FloatType for f32 {
 impl FloatType for f64 {
     const EXP: usize = 11;
     const SIG: usize = 53;
+    const NAME: &'static str = "f64";
     fn to_bits(self) -> BigUint {
         self.to_bits().to_biguint().unwrap()
     }
@@ -99,24 +102,22 @@ fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
     format!("sign={},exp={},sig={}", sign, exp, sig)
 }
 
+fn float_to_hex_inner<T: FloatType>(num: T) {
+    let bits = num.to_bits();
+    let hardfloat = to_hardfloat::<T>(&bits);
+    println!("    {}: {:#x}({})", T::NAME, bits, print_float::<T>(&bits));
+    println!(
+        "    h{}: {:#x}({})",
+        T::NAME,
+        hardfloat,
+        print_hardfloat::<T>(&hardfloat)
+    );
+}
+
 fn float_to_hex(num: f64) {
-    let b32 = (num as f32).to_bits().to_biguint().unwrap();
-    let hf32 = to_hardfloat::<f32>(&b32);
-    let b64 = (num as f64).to_bits().to_biguint().unwrap();
-    let hf64 = to_hardfloat::<f64>(&b64);
     println!("  float -> hex:");
-    println!(
-        "    f32: {:#x}({})",
-        (num as f32).to_bits(),
-        print_float::<f32>(&b32)
-    );
-    println!("    hf32: {:#x}({})", hf32, print_hardfloat::<f32>(&hf32));
-    println!(
-        "    f64: {:#x}({})",
-        (num).to_bits(),
-        print_float::<f64>(&b64)
-    );
-    println!("    hf64: {:#x}({})", hf64, print_hardfloat::<f64>(&hf64));
+    float_to_hex_inner::<f32>(num as f32);
+    float_to_hex_inner::<f64>(num as f64);
 }
 
 fn hex_to_float(num: u64) {
