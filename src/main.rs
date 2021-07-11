@@ -1,13 +1,16 @@
 use anyhow;
 use num_bigint::{BigUint, ToBigUint};
+use std::cmp::min;
 use std::env::args;
+use std::fmt::Display;
 
-trait FloatType {
+trait FloatType: Display {
     const EXP: usize;
     const SIG: usize;
     const WIDTH: usize = Self::EXP + Self::SIG;
     const NAME: &'static str;
     fn to_bits(self) -> BigUint;
+    fn from_bits(num: &BigUint) -> Self;
 }
 
 impl FloatType for f32 {
@@ -16,6 +19,9 @@ impl FloatType for f32 {
     const NAME: &'static str = "f32";
     fn to_bits(self) -> BigUint {
         self.to_bits().to_biguint().unwrap()
+    }
+    fn from_bits(num: &BigUint) -> Self {
+        f32::from_bits(num.iter_u32_digits().next().unwrap())
     }
 }
 
@@ -26,11 +32,13 @@ impl FloatType for f64 {
     fn to_bits(self) -> BigUint {
         self.to_bits().to_biguint().unwrap()
     }
+    fn from_bits(num: &BigUint) -> Self {
+        f64::from_bits(num.iter_u64_digits().next().unwrap())
+    }
 }
 
 fn range<T: FloatType>(num: &BigUint, upper: usize, lower: usize) -> BigUint {
     assert!(upper >= lower);
-    assert!(T::WIDTH > upper);
     (num >> lower) & ((1.to_biguint().unwrap() << (upper - lower + 1)) - 1u32)
 }
 
@@ -120,15 +128,31 @@ fn float_to_hex(num: f64) {
     float_to_hex_inner::<f64>(num as f64);
 }
 
-fn hex_to_float(num: u64) {
+fn hex_to_float_inner<T: FloatType>(num: &BigUint) {
+    let num_bits = num.bits() as usize;
+    let mut offset = 0;
+    let mut numbers = vec![];
+    while offset < num_bits {
+        numbers.push(T::from_bits(&range::<T>(
+            &num,
+            min(offset + T::WIDTH, num_bits - 1),
+            offset,
+        )));
+        offset += T::WIDTH;
+    }
+
+    print!("    {}:", T::NAME);
+    for num in numbers.iter().rev() {
+        print!(" {}", num);
+    }
+    println!("");
+}
+
+fn hex_to_float(num: &BigUint) {
     println!("  hex -> float:");
     println!("    hex: {:#x}", num);
-    println!("    f64: {}", f64::from_bits(num));
-    println!(
-        "    f32: {}, {}",
-        f32::from_bits((num >> 32) as u32),
-        f32::from_bits(num as u32)
-    );
+    hex_to_float_inner::<f64>(&num);
+    hex_to_float_inner::<f32>(&num);
 }
 
 fn main() -> anyhow::Result<()> {
@@ -136,11 +160,14 @@ fn main() -> anyhow::Result<()> {
         println!("{}:", arg);
         if arg.starts_with("0x") {
             let s = arg.trim_start_matches("0x");
-            let num = u64::from_str_radix(s, 16)?;
-            hex_to_float(num);
+            if let Some(num) = BigUint::parse_bytes(s.as_bytes(), 16) {
+                hex_to_float(&num);
+            }
         } else {
             if let Ok(num) = arg.parse::<u64>() {
-                hex_to_float(num);
+                if let Some(num) = BigUint::parse_bytes(arg.as_bytes(), 10) {
+                    hex_to_float(&num);
+                }
                 float_to_hex(num as f64);
             } else {
                 let num = arg.parse::<f64>()?;
