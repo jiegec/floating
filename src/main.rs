@@ -28,7 +28,7 @@ impl FloatType for f64 {
 fn range<T: FloatType>(num: &BigUint, upper: usize, lower: usize) -> BigUint {
     assert!(upper >= lower);
     assert!(T::WIDTH > upper);
-    (num >> lower) & ((1 << (upper - lower + 1)) - 1).to_biguint().unwrap()
+    (num >> lower) & ((1.to_biguint().unwrap() << (upper - lower + 1)) - 1u32)
 }
 
 fn bit<T: FloatType>(num: &BigUint, idx: usize) -> BigUint {
@@ -57,7 +57,7 @@ fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
         (f0.clone(), f0.clone())
     } else if is_zero_exp_in && !is_zero_sig_in {
         let mut leading_zeros = 0u32;
-        for bit in (0..T::SIG-1).rev() {
+        for bit in (0..T::SIG - 1).rev() {
             if sig_in.bit(bit as u64) {
                 break;
             } else {
@@ -102,18 +102,21 @@ fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
 fn float_to_hex(num: f64) {
     let b32 = (num as f32).to_bits().to_biguint().unwrap();
     let hf32 = to_hardfloat::<f32>(&b32);
+    let b64 = (num as f64).to_bits().to_biguint().unwrap();
+    let hf64 = to_hardfloat::<f64>(&b64);
     println!("  float -> hex:");
     println!(
         "    f32: {:#x}({})",
         (num as f32).to_bits(),
         print_float::<f32>(&b32)
     );
+    println!("    hf32: {:#x}({})", hf32, print_hardfloat::<f32>(&hf32));
     println!(
-        "    hf32: {:#x}({})",
-        hf32,
-        print_hardfloat::<f32>(&hf32)
+        "    f64: {:#x}({})",
+        (num).to_bits(),
+        print_float::<f64>(&b64)
     );
-    println!("    f64: {:#x}", (num).to_bits());
+    println!("    hf64: {:#x}({})", hf64, print_hardfloat::<f64>(&hf64));
 }
 
 fn hex_to_float(num: u64) {
@@ -121,7 +124,7 @@ fn hex_to_float(num: u64) {
     println!("    hex: {:#x}", num);
     println!("    f64: {}", f64::from_bits(num));
     println!(
-        "  f32: {}, {}",
+        "    f32: {}, {}",
         f32::from_bits((num >> 32) as u32),
         f32::from_bits(num as u32)
     );
