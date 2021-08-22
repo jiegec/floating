@@ -1,20 +1,22 @@
 use crate::{extract, pack, FloatType};
-use num_bigint::ToBigUint;
+use num_bigint::{BigUint, ToBigUint};
 
-pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
+fn effective_add<T: FloatType>(
+    sign_a: BigUint,
+    exp_a: BigUint,
+    man_a: BigUint,
+    sign_b: BigUint,
+    exp_b: BigUint,
+    man_b: BigUint,
+) -> T {
     let zero = 0.to_biguint().unwrap();
     let one = 1.to_biguint().unwrap();
     let two = 2.to_biguint().unwrap();
     let three = 3.to_biguint().unwrap();
     let norm_bit = &one << (T::SIG - 1);
 
-    let num_a = a.to_biguint();
-    let (sign_a, exp_a, man_a) = extract::<T>(&num_a);
-    let num_b = b.to_biguint();
-    let (sign_b, exp_b, man_b) = extract::<T>(&num_b);
-
     if exp_a < exp_b {
-        return softfloat_add(b, a);
+        return effective_add(sign_b, exp_b, man_b, sign_a, exp_a, man_a);
     }
 
     // now exp_a >= exp_b
@@ -89,6 +91,32 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
     T::from_biguint(&pack::<T>(&sign_c, &exp_c, &man_c))
 }
 
+fn effective_sub<T: FloatType>(
+    sign_a: BigUint,
+    exp_a: BigUint,
+    man_a: BigUint,
+    sign_b: BigUint,
+    exp_b: BigUint,
+    man_b: BigUint,
+) -> T {
+    todo!()
+}
+
+pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
+    let one = 1.to_biguint().unwrap();
+    let num_a = a.to_biguint();
+    let (sign_a, exp_a, man_a) = extract::<T>(&num_a);
+    let num_b = b.to_biguint();
+    let (sign_b, exp_b, man_b) = extract::<T>(&num_b);
+    if (&sign_a ^ &sign_b) == one {
+        // sub
+        effective_sub(sign_a, exp_a, man_a, sign_b, exp_b, man_b)
+    } else {
+        // add
+        effective_add(sign_a, exp_a, man_a, sign_b, exp_b, man_b)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{print_float, softfloat_add, FloatType};
@@ -100,6 +128,8 @@ mod tests {
             (1.0, 1.1),
             (1.0, 2.0),
             (0.1, 0.2),
+            (0.1, -0.2),
+            (0.1, -0.1),
             // subnormal/zero + normal
             (0.0, 0.1),
             (1.0 / 1.5E+308, 0.1),
