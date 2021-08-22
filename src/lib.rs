@@ -56,6 +56,10 @@ pub fn extract<T: FloatType>(num: &BigUint) -> (BigUint, BigUint, BigUint) {
     )
 }
 
+pub fn pack<T: FloatType>(sign: &BigUint, exp: &BigUint, man: &BigUint) -> BigUint {
+    (sign << (T::WIDTH - 1)) + (exp << (T::SIG - 1)) + man
+}
+
 pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
     let one = 1.to_biguint().unwrap();
     let num_a = a.to_bits();
@@ -87,7 +91,7 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
     assert!(sign_a == sign_b);
     let sign_c = &sign_a;
 
-    T::from_bits(&((sign_c << (T::WIDTH - 1)) + (exp_c << (T::SIG - 1)) + man_c))
+    T::from_bits(&pack::<T>(sign_c, &exp_c, &man_c))
 }
 
 #[cfg(test)]
