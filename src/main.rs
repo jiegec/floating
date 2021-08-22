@@ -2,16 +2,7 @@ use anyhow;
 use num_bigint::{BigUint, ToBigUint};
 use std::cmp::min;
 use std::env::args;
-use floating::FloatType;
-
-fn range<T: FloatType>(num: &BigUint, upper: usize, lower: usize) -> BigUint {
-    assert!(upper >= lower);
-    (num >> lower) & ((1.to_biguint().unwrap() << (upper - lower + 1)) - 1u32)
-}
-
-fn bit<T: FloatType>(num: &BigUint, idx: usize) -> BigUint {
-    (num >> idx) & 1.to_biguint().unwrap()
-}
+use floating::{FloatType, range, bit};
 
 fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
     let f0: BigUint = 0.to_biguint().unwrap();

@@ -34,3 +34,12 @@ impl FloatType for f64 {
         f64::from_bits(num.iter_u64_digits().next().unwrap())
     }
 }
+
+pub fn range<T: FloatType>(num: &BigUint, upper: usize, lower: usize) -> BigUint {
+    assert!(upper >= lower);
+    (num >> lower) & ((1.to_biguint().unwrap() << (upper - lower + 1)) - 1u32)
+}
+
+pub fn bit<T: FloatType>(num: &BigUint, idx: usize) -> BigUint {
+    (num >> idx) & 1.to_biguint().unwrap()
+}
