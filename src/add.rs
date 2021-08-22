@@ -94,7 +94,7 @@ mod tests {
     use crate::{print_float, softfloat_add, FloatType};
 
     #[test]
-    fn test_add() {
+    fn test() {
         for (a, b) in vec![
             // normal + normal
             (1.0, 1.1),
