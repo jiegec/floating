@@ -1,5 +1,5 @@
 use anyhow;
-use floating::{bit, extract, range, FloatType};
+use floating::{bit, print_float, range, FloatType};
 use num_bigint::{BigUint, ToBigUint};
 use std::cmp::min;
 use std::env::args;
@@ -52,11 +52,6 @@ fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
         (exp, sig_in)
     };
     (sign << (T::EXP + T::SIG)) | (exp << (T::SIG - 1)) | sig
-}
-
-fn print_float<T: FloatType>(bits: &BigUint) -> String {
-    let (sign, exp, man) = extract::<T>(bits);
-    format!("sign={},exp={},man={}", sign, exp, man)
 }
 
 fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {

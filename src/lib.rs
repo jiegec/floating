@@ -60,8 +60,22 @@ pub fn pack<T: FloatType>(sign: &BigUint, exp: &BigUint, man: &BigUint) -> BigUi
     (sign << (T::WIDTH - 1)) + (exp << (T::SIG - 1)) + man
 }
 
+pub fn print_float<T: FloatType>(bits: &BigUint) -> String {
+    let (sign, exp, man) = extract::<T>(bits);
+    format!(
+        "sign={},exp={},man={:0width$b}",
+        sign,
+        exp,
+        man,
+        width = T::SIG - 1
+    )
+}
+
 pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
     let one = 1.to_biguint().unwrap();
+    let two = 2.to_biguint().unwrap();
+    let three = 3.to_biguint().unwrap();
+
     let num_a = a.to_bits();
     let (sign_a, exp_a, man_a) = extract::<T>(&num_a);
     let num_b = b.to_bits();
@@ -74,17 +88,32 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
 
     // assume normalized
     let norm_bit = &one << (T::SIG - 1);
-    let norm_a = man_a + &norm_bit;
-    let norm_b = man_b + &norm_bit;
+    let mut norm_a = man_a + &norm_bit;
+    let mut norm_b = man_b + &norm_bit;
+    // pre left shift by one for rounding
+    norm_a = norm_a << 1;
+    norm_b = norm_b << 1;
 
-    let exp_diff = (&exp_a - exp_b).to_u64_digits()[0];
+    let exp_diff = (&exp_a - exp_b).to_u64_digits().pop().unwrap_or(0);
     let mut exp_c = exp_a;
     let norm_b_shifted = norm_b >> exp_diff;
     let mut man_c = norm_a + norm_b_shifted;
-    if man_c > &norm_bit << 1 {
+
+    if man_c > &norm_bit << 2 {
         exp_c = exp_c + &one;
         man_c = man_c >> 1;
     }
+
+    // round to nearest even
+    // ....1 1
+    // ->
+    // ....1+1
+    if (&man_c & &three) == three {
+        man_c = man_c + two;
+    }
+    // remove pre shifted bit
+    man_c = man_c >> 1;
+
     man_c = man_c - &norm_bit;
 
     // TODO
@@ -96,10 +125,22 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
 
 #[cfg(test)]
 mod tests {
-    use crate::softfloat_add;
+    use crate::{print_float, softfloat_add, FloatType};
 
     #[test]
     fn test() {
-        assert_eq!(3.0, softfloat_add(1.0, 2.0));
+        for (a, b) in vec![(1.0, 1.1), (1.0, 2.0), (0.1, 0.2), (0.0, 0.1)] {
+            let c = a + b;
+            let soft_c = softfloat_add(a, b);
+            println!("a={}({})", a, print_float::<f64>(&a.to_bits()));
+            println!("b={}({})", b, print_float::<f64>(&b.to_bits()));
+            println!("a+b={}({})", c, print_float::<f64>(&c.to_bits()));
+            println!(
+                "soft a+b={}({})",
+                soft_c,
+                print_float::<f64>(&soft_c.to_bits())
+            );
+            assert_eq!(c, soft_c);
+        }
     }
 }
