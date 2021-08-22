@@ -136,42 +136,55 @@ fn effective_sub<T: FloatType>(
             // case 1.1: subnormal/zero - subnormal/zero
             let exp_c = zero;
             if man_a > man_b {
-		let sign_c = sign_a;
+                let sign_c = sign_a;
                 let man_c = &man_a - &man_b;
                 (sign_c, exp_c, man_c)
             } else {
-		let sign_c = sign_b;
+                let sign_c = sign_b;
                 let man_c = &man_b - &man_a;
                 (sign_c, exp_c, man_c)
             }
         } else if exp_a == T::max_exp() {
             // case 1.2: inf/nan - inf/nan
-            if man_a == zero {
-                // inf
-                (sign_b, exp_b, man_b)
-            } else {
+            if man_a != zero {
                 // nan
                 (sign_a, exp_a, man_a)
+            } else if man_b != zero {
+                // nan
+                (sign_b, exp_b, man_b)
+            } else {
+                // inf - inf = nan
+                // signaling
+                (zero, T::max_exp(), one << (T::SIG - 2))
             }
         } else {
             // case 1.3: normal - normal
             if man_a < man_b {
                 // |a| < |b|
-		todo!()
+                let sign_c = one - sign_b;
+                let mut man_c = man_b - man_a;
+                let man_diff = man_c.to_u64_digits()[0];
+                // shift=0 when clz=11([63:53])
+                let shift = man_diff.leading_zeros() - (64 - T::SIG) as u32;
+                let exp_c = exp_a - shift;
+                man_c = man_c << shift;
+                man_c -= norm_bit;
+                (sign_c, exp_c, man_c)
             } else if man_a > man_b {
                 // |a| > |b|
-		let sign_c = sign_a;
-		// 23 bits
-		let man_c = man_a - man_b;
-		let man_diff = man_c.to_u64_digits()[0];
-		// shift=0 when clz=8([31:24])
-		let shift = man_diff.leading_zeros() - 8;
-		let exp_c = exp_a - (shift + 1);
-		(sign_c, exp_c, man_c << shift)
+                let sign_c = sign_a;
+                let mut man_c = man_a - man_b;
+                let man_diff = man_c.to_u64_digits()[0];
+                // shift=0 when clz=12([63:53])
+                let shift = man_diff.leading_zeros() - (64 - T::SIG) as u32;
+                let exp_c = exp_a - shift;
+                man_c = man_c << shift;
+                man_c -= norm_bit;
+                (sign_c, exp_c, man_c)
             } else {
                 // |a| == |b|
-		let sign_c = sign_a;
-		(sign_c, zero.clone(), zero.clone())
+                let sign_c = sign_a;
+                (sign_c, zero.clone(), zero.clone())
             }
         }
     } else {
@@ -219,8 +232,8 @@ fn effective_sub<T: FloatType>(
                 (sign_c, exp_c, man_c)
             } else {
                 // |a| < |b|
-                let sign_c = sign_b;
-                let exp_c = &exp_b - one;
+                let sign_c = &one - sign_a;
+                let exp_c = &exp_b - &one;
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
                 let mut man_c = norm_b - (norm_a >> exp_diff);
 
@@ -315,21 +328,19 @@ mod tests {
             );
             assert_eq!(aplusb.to_bits(), soft_aplusb.to_bits());
 
-            /*
-                let aminusb = a - b;
-                let soft_aminusb = softfloat_sub(a, b);
-                println!(
-                    "a-b={}({})",
-                    aminusb,
-                    print_float::<f64>(&aminusb.to_biguint())
-                );
-                println!(
-                    "soft a-b={}({})",
-                    soft_aminusb,
-                    print_float::<f64>(&soft_aminusb.to_biguint())
-                );
-                assert_eq!(aminusb.to_bits(), soft_aminusb.to_bits());
-            */
+            let aminusb = a - b;
+            let soft_aminusb = softfloat_sub(a, b);
+            println!(
+                "a-b={}({})",
+                aminusb,
+                print_float::<f64>(&aminusb.to_biguint())
+            );
+            println!(
+                "soft a-b={}({})",
+                soft_aminusb,
+                print_float::<f64>(&soft_aminusb.to_biguint())
+            );
+            assert_eq!(aminusb.to_bits(), soft_aminusb.to_bits());
         }
     }
 }
