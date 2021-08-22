@@ -107,7 +107,13 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
             (sign_c, exp_c, man_c)
         } else if exp_a == T::max_exp() {
             // case 1.2: Inf/NaN + Inf/NaN
-            todo!()
+            if man_a == zero {
+                // Inf
+                (sign_b, exp_b, man_b)
+            } else {
+                // NaN
+                (sign_a, exp_a, man_a)
+            }
         } else {
             // case 1.3: normal + normal
             // add implicit 1.0
@@ -173,6 +179,8 @@ mod tests {
             (0.0, 0.1),
             (1.0 / 1.5E+308, 1.0 / 1.0E+308),
             (f64::INFINITY, f64::NAN),
+            (f64::NAN, f64::NAN),
+            (f64::INFINITY, f64::INFINITY),
         ] {
             let c = a + b;
             let soft_c = softfloat_add(a, b);
@@ -184,7 +192,7 @@ mod tests {
                 soft_c,
                 print_float::<f64>(&soft_c.to_biguint())
             );
-            assert_eq!(c, soft_c);
+            assert_eq!(c.to_bits(), soft_c.to_bits());
         }
     }
 }
