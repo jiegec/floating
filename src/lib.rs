@@ -1,5 +1,5 @@
 use num_bigint::{BigUint, ToBigUint};
-use std::{fmt::Display};
+use std::fmt::Display;
 
 mod add;
 mod classify;

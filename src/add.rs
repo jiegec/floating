@@ -15,13 +15,8 @@ fn effective_add<T: FloatType>(
     let three = 3.to_biguint().unwrap();
     let norm_bit = &one << (T::SIG - 1);
 
-    if exp_a < exp_b {
-        return effective_add(sign_b, exp_b, man_b, sign_a, exp_a, man_a);
-    }
-
     // now exp_a >= exp_b
-    let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
-    let (sign_c, exp_c, man_c) = if exp_diff == 0 {
+    let (sign_c, exp_c, man_c) = if exp_a == exp_b {
         // case 1: exponent equals
         if exp_a == zero {
             // case 1.1: subnormal/zero + subnormal/zero
@@ -58,35 +53,63 @@ fn effective_add<T: FloatType>(
         }
     } else {
         // case: exponent differs
-        let mut norm_a = man_a + &norm_bit;
-        let mut norm_b = man_b + &norm_bit;
-        // pre left shift by one for rounding
-        norm_a = norm_a << 1;
-        norm_b = norm_b << 1;
+        if exp_a == T::max_exp() {
+            // inf/nan
+            (sign_a, exp_a, man_a)
+        } else if exp_b == T::max_exp() {
+            // inf/nan
+            (sign_b, exp_b, man_b)
+        } else {
+            let mut norm_a = man_a;
+            let mut norm_b = man_b;
 
-        let mut exp_c = exp_a;
-        let norm_b_shifted = norm_b >> exp_diff;
-        let mut man_c = norm_a + norm_b_shifted;
+            // pre left shift by one for rounding
+            norm_a = norm_a << 1;
+            norm_b = norm_b << 1;
 
-        if man_c > &norm_bit << 2 {
-            exp_c = exp_c + &one;
+            let mut exp_c = if exp_a > exp_b {
+                // exp_a > exp_b
+                let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
+                if exp_b != zero {
+                    // normal
+                    norm_b += &norm_bit << 1;
+                }
+                norm_b >>= exp_diff;
+                exp_a
+            } else {
+                // exp_a < exp_b
+                let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
+                if exp_a != zero {
+                    // normal
+                    norm_a += &norm_bit << 1;
+                }
+                norm_a >>= exp_diff;
+                exp_b
+            };
+
+            // the bigger one is always normal
+            let mut man_c = norm_a + norm_b + (&norm_bit << 1);
+
+            if man_c >= &norm_bit << 2 {
+                exp_c = exp_c + &one;
+                man_c = man_c >> 1;
+            }
+
+            // round to nearest even
+            // ....1 1
+            // ->
+            // ....1+1
+            if (&man_c & &three) == three {
+                man_c = man_c + two;
+            }
+            // remove pre shifted bit
             man_c = man_c >> 1;
+
+            man_c = man_c - &norm_bit;
+
+            let sign_c = sign_a;
+            (sign_c, exp_c, man_c)
         }
-
-        // round to nearest even
-        // ....1 1
-        // ->
-        // ....1+1
-        if (&man_c & &three) == three {
-            man_c = man_c + two;
-        }
-        // remove pre shifted bit
-        man_c = man_c >> 1;
-
-        man_c = man_c - &norm_bit;
-
-        let sign_c = sign_a;
-        (sign_c, exp_c, man_c)
     };
     T::from_biguint(&pack::<T>(&sign_c, &exp_c, &man_c))
 }
@@ -99,7 +122,38 @@ fn effective_sub<T: FloatType>(
     exp_b: BigUint,
     man_b: BigUint,
 ) -> T {
-    todo!()
+    let zero = 0.to_biguint().unwrap();
+
+    let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
+    let (sign_c, exp_c, man_c) = if exp_diff == 0 {
+        // case 1: exponent equals
+        if exp_a == zero {
+            // case 1.1: subnormal/zero - subnormal/zero
+            let sign_c = sign_a;
+            let exp_c = zero;
+            if man_a > man_b {
+                let man_c = &man_a - &man_b;
+                (sign_c, exp_c, man_c)
+            } else {
+                todo!()
+            }
+        } else if exp_a == T::max_exp() {
+            // case 1.2: inf/nan - inf/nan
+            if man_a == zero {
+                // inf
+                (sign_b, exp_b, man_b)
+            } else {
+                // nan
+                (sign_a, exp_a, man_a)
+            }
+        } else {
+            // case 1.3: normal - normal
+            todo!()
+        }
+    } else {
+        todo!()
+    };
+    T::from_biguint(&pack::<T>(&sign_c, &exp_c, &man_c))
 }
 
 pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
@@ -117,9 +171,24 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
     }
 }
 
+pub fn softfloat_sub<T: FloatType>(a: T, b: T) -> T {
+    let one = 1.to_biguint().unwrap();
+    let num_a = a.to_biguint();
+    let (sign_a, exp_a, man_a) = extract::<T>(&num_a);
+    let num_b = b.to_biguint();
+    let (sign_b, exp_b, man_b) = extract::<T>(&num_b);
+    if (&sign_a ^ &sign_b) == one {
+        // add
+        effective_add(sign_a, exp_a, man_a, sign_b, exp_b, man_b)
+    } else {
+        // sub
+        effective_sub(sign_a, exp_a, man_a, sign_b, exp_b, man_b)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{print_float, softfloat_add, FloatType};
+    use crate::{print_float, softfloat_add, softfloat_sub, FloatType};
 
     #[test]
     fn test() {
@@ -141,17 +210,38 @@ mod tests {
             (f64::NAN, f64::NAN),
             (f64::INFINITY, f64::INFINITY),
         ] {
-            let c = a + b;
-            let soft_c = softfloat_add(a, b);
             println!("a={}({})", a, print_float::<f64>(&a.to_biguint()));
             println!("b={}({})", b, print_float::<f64>(&b.to_biguint()));
-            println!("a+b={}({})", c, print_float::<f64>(&c.to_biguint()));
+
+            let aplusb = a + b;
+            let soft_aplusb = softfloat_add(a, b);
+            println!(
+                "a+b={}({})",
+                aplusb,
+                print_float::<f64>(&aplusb.to_biguint())
+            );
             println!(
                 "soft a+b={}({})",
-                soft_c,
-                print_float::<f64>(&soft_c.to_biguint())
+                soft_aplusb,
+                print_float::<f64>(&soft_aplusb.to_biguint())
             );
-            assert_eq!(c.to_bits(), soft_c.to_bits());
+            assert_eq!(aplusb.to_bits(), soft_aplusb.to_bits());
+
+            /*
+                let aminusb = a - b;
+                let soft_aminusb = softfloat_sub(a, b);
+                println!(
+                    "a-b={}({})",
+                    aminusb,
+                    print_float::<f64>(&aminusb.to_biguint())
+                );
+                println!(
+                    "soft a-b={}({})",
+                    soft_aminusb,
+                    print_float::<f64>(&soft_aminusb.to_biguint())
+                );
+                assert_eq!(aminusb.to_bits(), soft_aminusb.to_bits());
+            */
         }
     }
 }
