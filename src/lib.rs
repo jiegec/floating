@@ -7,8 +7,8 @@ pub trait FloatType: Display + Copy + Clone {
     const SIG: usize;
     const WIDTH: usize = Self::EXP + Self::SIG;
     const NAME: &'static str;
-    fn to_bits(self) -> BigUint;
-    fn from_bits(num: &BigUint) -> Self;
+    fn to_biguint(self) -> BigUint;
+    fn from_biguint(num: &BigUint) -> Self;
     fn bias() -> BigUint {
         (1.to_biguint().unwrap() << (Self::EXP - 1)) - 1.to_biguint().unwrap()
     }
@@ -21,10 +21,10 @@ impl FloatType for f32 {
     const EXP: usize = 8;
     const SIG: usize = 24;
     const NAME: &'static str = "f32";
-    fn to_bits(self) -> BigUint {
+    fn to_biguint(self) -> BigUint {
         self.to_bits().to_biguint().unwrap()
     }
-    fn from_bits(num: &BigUint) -> Self {
+    fn from_biguint(num: &BigUint) -> Self {
         f32::from_bits(num.iter_u32_digits().next().unwrap())
     }
 }
@@ -33,10 +33,10 @@ impl FloatType for f64 {
     const EXP: usize = 11;
     const SIG: usize = 53;
     const NAME: &'static str = "f64";
-    fn to_bits(self) -> BigUint {
+    fn to_biguint(self) -> BigUint {
         self.to_bits().to_biguint().unwrap()
     }
-    fn from_bits(num: &BigUint) -> Self {
+    fn from_biguint(num: &BigUint) -> Self {
         f64::from_bits(num.iter_u64_digits().next().unwrap())
     }
 }
@@ -86,9 +86,9 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
     let three = 3.to_biguint().unwrap();
     let norm_bit = &one << (T::SIG - 1);
 
-    let num_a = a.to_bits();
+    let num_a = a.to_biguint();
     let (sign_a, exp_a, man_a) = extract::<T>(&num_a);
-    let num_b = b.to_bits();
+    let num_b = b.to_biguint();
     let (sign_b, exp_b, man_b) = extract::<T>(&num_b);
 
     if exp_a < exp_b {
@@ -158,7 +158,7 @@ pub fn softfloat_add<T: FloatType>(a: T, b: T) -> T {
         let sign_c = sign_a;
         (sign_c, exp_c, man_c)
     };
-    T::from_bits(&pack::<T>(&sign_c, &exp_c, &man_c))
+    T::from_biguint(&pack::<T>(&sign_c, &exp_c, &man_c))
 }
 #[cfg(test)]
 mod tests {
@@ -172,16 +172,17 @@ mod tests {
             (0.1, 0.2),
             (0.0, 0.1),
             (1.0 / 1.5E+308, 1.0 / 1.0E+308),
+            (f64::INFINITY, f64::NAN),
         ] {
             let c = a + b;
             let soft_c = softfloat_add(a, b);
-            println!("a={}({})", a, print_float::<f64>(&a.to_bits()));
-            println!("b={}({})", b, print_float::<f64>(&b.to_bits()));
-            println!("a+b={}({})", c, print_float::<f64>(&c.to_bits()));
+            println!("a={}({})", a, print_float::<f64>(&a.to_biguint()));
+            println!("b={}({})", b, print_float::<f64>(&b.to_biguint()));
+            println!("a+b={}({})", c, print_float::<f64>(&c.to_biguint()));
             println!(
                 "soft a+b={}({})",
                 soft_c,
-                print_float::<f64>(&soft_c.to_bits())
+                print_float::<f64>(&soft_c.to_biguint())
             );
             assert_eq!(c, soft_c);
         }

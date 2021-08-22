@@ -62,7 +62,7 @@ fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
 }
 
 fn float_to_hex_inner<T: FloatType>(num: T) {
-    let bits = num.to_bits();
+    let bits = num.to_biguint();
     let hardfloat = to_hardfloat::<T>(&bits);
     println!("    {}: {:#x}({})", T::NAME, bits, print_float::<T>(&bits));
     println!(
@@ -84,7 +84,7 @@ fn hex_to_float_inner<T: FloatType>(num: &BigUint) {
     let mut offset = 0;
     let mut numbers = vec![];
     while offset < num_bits {
-        numbers.push(T::from_bits(&range::<T>(
+        numbers.push(T::from_biguint(&range::<T>(
             &num,
             min(offset + T::WIDTH, num_bits - 1),
             offset,
