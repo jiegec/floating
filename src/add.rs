@@ -20,12 +20,14 @@ fn effective_add<T: FloatType>(
         // case 1: exponent equals
         if exp_a == zero {
             // case 1.1: subnormal/zero + subnormal/zero
+            // sum up mantissa
             let sign_c = sign_a;
             let exp_c = zero;
             let man_c = &man_a + &man_b;
             (sign_c, exp_c, man_c)
         } else if exp_a == T::max_exp() {
             // case 1.2: inf/nan + inf/nan
+            // propagate nan
             if man_a == zero {
                 // inf
                 (sign_b, exp_b, man_b)
@@ -44,6 +46,8 @@ fn effective_add<T: FloatType>(
             let mut man_c = norm_a + norm_b;
 
             // normalize and rounding to nearest even
+            // if the lowest two bits are 0b11
+            // it should be rounded up
             if (&man_c & &three) == three {
                 man_c = man_c + two;
             }
@@ -71,18 +75,20 @@ fn effective_add<T: FloatType>(
                 // exp_a > exp_b
                 let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
                 if exp_b != zero {
-                    // normal
+                    // add implicit 1.0
                     norm_b += &norm_bit << 1;
                 }
+                // align
                 norm_b >>= exp_diff;
                 exp_a
             } else {
                 // exp_a < exp_b
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
                 if exp_a != zero {
-                    // normal
+                    // add implicit 1.0
                     norm_a += &norm_bit << 1;
                 }
+                // align
                 norm_a >>= exp_diff;
                 exp_b
             };
@@ -96,9 +102,7 @@ fn effective_add<T: FloatType>(
             }
 
             // round to nearest even
-            // ....1 1
-            // ->
-            // ....1+1
+            // round up when ....1 1
             if (&man_c & &three) == three {
                 man_c = man_c + two;
             }
@@ -123,9 +127,10 @@ fn effective_sub<T: FloatType>(
     man_b: BigUint,
 ) -> T {
     let zero = 0.to_biguint().unwrap();
+    let one = 1.to_biguint().unwrap();
+    let norm_bit = &one << (T::SIG - 1);
 
-    let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
-    let (sign_c, exp_c, man_c) = if exp_diff == 0 {
+    let (sign_c, exp_c, man_c) = if exp_a == exp_b {
         // case 1: exponent equals
         if exp_a == zero {
             // case 1.1: subnormal/zero - subnormal/zero
@@ -151,7 +156,65 @@ fn effective_sub<T: FloatType>(
             todo!()
         }
     } else {
-        todo!()
+        // case 2: exponent differs
+        if exp_a == T::max_exp() {
+            // inf/nan
+            (sign_a, exp_a, man_a)
+        } else if exp_b == T::max_exp() {
+            // inf/nan
+            (sign_b, exp_b, man_b)
+        } else {
+            // pre shift for rounding
+            let mut norm_a = if exp_a == zero {
+                // subnormal
+                man_a.clone()
+            } else {
+                // normal
+                &man_a + &norm_bit
+            };
+	    norm_a <<= 1;
+            let mut norm_b = if exp_b == zero {
+                // subnormal
+                man_b.clone()
+            } else {
+                // normal
+                &man_b + &norm_bit
+            };
+	    norm_b <<= 1;
+
+            if exp_a > exp_b {
+                // |a| > |b|
+                let sign_c = sign_a;
+                let exp_c = &exp_a - one;
+
+                let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
+                let mut man_c = norm_a - (norm_b >> exp_diff);
+
+		// shift for exp -1
+		man_c = man_c << 1;
+		man_c = man_c - &norm_bit;
+
+		// remove pre shifted bit
+		man_c = man_c >> 1;
+
+                (sign_c, exp_c, man_c)
+            } else {
+                // |a| < |b|
+                let sign_c = sign_b;
+                let exp_c = &exp_b - one;
+                let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
+                let mut man_c = norm_b - (norm_a >> exp_diff);
+
+		// shift for exp -1
+		man_c = man_c << 1;
+		man_c = man_c - &norm_bit;
+
+		// remove pre shifted bit
+		man_c = man_c >> 1;
+
+                (sign_c, exp_c, man_c)
+            }
+        }
     };
     T::from_biguint(&pack::<T>(&sign_c, &exp_c, &man_c))
 }
@@ -205,10 +268,16 @@ mod tests {
             // subnormal/zero + subnormal/zero
             (1.0 / 1.5E+308, 1.0 / 1.0E+308),
             (0.0, 1.0 / 1.0E+308),
+            (0.0, 0.0),
+            (-0.0, 0.0),
             // inf/nan + inf/nan
             (f64::INFINITY, f64::NAN),
+            (f64::INFINITY, -f64::NAN),
             (f64::NAN, f64::NAN),
+            (-f64::NAN, f64::NAN),
             (f64::INFINITY, f64::INFINITY),
+            (-f64::INFINITY, -f64::INFINITY),
+            (-f64::INFINITY, f64::INFINITY),
         ] {
             println!("a={}({})", a, print_float::<f64>(&a.to_biguint()));
             println!("b={}({})", b, print_float::<f64>(&b.to_biguint()));
