@@ -1,8 +1,8 @@
 use anyhow;
+use floating::{bit, extract, range, FloatType};
 use num_bigint::{BigUint, ToBigUint};
 use std::cmp::min;
 use std::env::args;
-use floating::{FloatType, range, bit};
 
 fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
     let f0: BigUint = 0.to_biguint().unwrap();
@@ -55,10 +55,8 @@ fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
 }
 
 fn print_float<T: FloatType>(bits: &BigUint) -> String {
-    let sign = bit::<T>(bits, T::SIG + T::EXP - 1);
-    let exp = range::<T>(bits, T::SIG + T::EXP - 2, T::SIG - 1);
-    let sig = range::<T>(bits, T::SIG - 2, 0);
-    format!("sign={},exp={},sig={}", sign, exp, sig)
+    let (sign, exp, man) = extract::<T>(bits);
+    format!("sign={},exp={},man={}", sign, exp, man)
 }
 
 fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
