@@ -30,7 +30,7 @@ impl FloatType for f32 {
         self.to_bits().to_biguint().unwrap()
     }
     fn from_biguint(num: &BigUint) -> Self {
-        f32::from_bits(num.iter_u32_digits().next().unwrap())
+        f32::from_bits(num.iter_u32_digits().next().unwrap_or(0))
     }
 }
 
@@ -42,7 +42,7 @@ impl FloatType for f64 {
         self.to_bits().to_biguint().unwrap()
     }
     fn from_biguint(num: &BigUint) -> Self {
-        f64::from_bits(num.iter_u64_digits().next().unwrap())
+        f64::from_bits(num.iter_u64_digits().next().unwrap_or(0))
     }
 }
 

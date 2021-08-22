@@ -134,13 +134,15 @@ fn effective_sub<T: FloatType>(
         // case 1: exponent equals
         if exp_a == zero {
             // case 1.1: subnormal/zero - subnormal/zero
-            let sign_c = sign_a;
             let exp_c = zero;
             if man_a > man_b {
+		let sign_c = sign_a;
                 let man_c = &man_a - &man_b;
                 (sign_c, exp_c, man_c)
             } else {
-                todo!()
+		let sign_c = sign_b;
+                let man_c = &man_b - &man_a;
+                (sign_c, exp_c, man_c)
             }
         } else if exp_a == T::max_exp() {
             // case 1.2: inf/nan - inf/nan
@@ -153,7 +155,24 @@ fn effective_sub<T: FloatType>(
             }
         } else {
             // case 1.3: normal - normal
-            todo!()
+            if man_a < man_b {
+                // |a| < |b|
+		todo!()
+            } else if man_a > man_b {
+                // |a| > |b|
+		let sign_c = sign_a;
+		// 23 bits
+		let man_c = man_a - man_b;
+		let man_diff = man_c.to_u64_digits()[0];
+		// shift=0 when clz=8([31:24])
+		let shift = man_diff.leading_zeros() - 8;
+		let exp_c = exp_a - (shift + 1);
+		(sign_c, exp_c, man_c << shift)
+            } else {
+                // |a| == |b|
+		let sign_c = sign_a;
+		(sign_c, zero.clone(), zero.clone())
+            }
         }
     } else {
         // case 2: exponent differs
@@ -172,7 +191,7 @@ fn effective_sub<T: FloatType>(
                 // normal
                 &man_a + &norm_bit
             };
-	    norm_a <<= 1;
+            norm_a <<= 1;
             let mut norm_b = if exp_b == zero {
                 // subnormal
                 man_b.clone()
@@ -180,7 +199,7 @@ fn effective_sub<T: FloatType>(
                 // normal
                 &man_b + &norm_bit
             };
-	    norm_b <<= 1;
+            norm_b <<= 1;
 
             if exp_a > exp_b {
                 // |a| > |b|
@@ -190,12 +209,12 @@ fn effective_sub<T: FloatType>(
                 let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
                 let mut man_c = norm_a - (norm_b >> exp_diff);
 
-		// shift for exp -1
-		man_c = man_c << 1;
-		man_c = man_c - &norm_bit;
+                // shift for exp-1
+                man_c = man_c << 1;
+                man_c = man_c - (&norm_bit << 1);
 
-		// remove pre shifted bit
-		man_c = man_c >> 1;
+                // remove pre shifted bit
+                man_c = man_c >> 1;
 
                 (sign_c, exp_c, man_c)
             } else {
@@ -205,12 +224,12 @@ fn effective_sub<T: FloatType>(
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
                 let mut man_c = norm_b - (norm_a >> exp_diff);
 
-		// shift for exp -1
-		man_c = man_c << 1;
-		man_c = man_c - &norm_bit;
+                // shift for exp-1
+                man_c = man_c << 1;
+                man_c = man_c - (&norm_bit << 1);
 
-		// remove pre shifted bit
-		man_c = man_c >> 1;
+                // remove pre shifted bit
+                man_c = man_c >> 1;
 
                 (sign_c, exp_c, man_c)
             }
