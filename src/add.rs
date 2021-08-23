@@ -28,11 +28,14 @@ fn effective_add<T: FloatType>(
         } else if exp_a == T::max_exp() {
             // case 1.2: inf/nan + inf/nan
             // propagate nan
-            if man_a == zero {
-                // inf
-                (sign_b, exp_b, man_b)
-            } else {
+            if man_a != zero {
                 // nan
+                (sign_a, T::max_exp(), man_a)
+            } else if man_b != zero {
+                // nan
+                (sign_b, T::max_exp(), man_b)
+            } else {
+                // inf
                 (sign_a, exp_a, man_a)
             }
         } else {
@@ -134,14 +137,22 @@ fn effective_sub<T: FloatType>(
         // case 1: exponent equals
         if exp_a == zero {
             // case 1.1: subnormal/zero - subnormal/zero
-            let exp_c = zero;
+            let exp_c = zero.clone();
             if man_a > man_b {
+                // |a| > |b|
                 let sign_c = sign_a;
                 let man_c = &man_a - &man_b;
                 (sign_c, exp_c, man_c)
-            } else {
-                let sign_c = sign_b;
+            } else if man_a < man_b {
+                // |a| < |b|
+                let sign_c = &one - sign_a;
                 let man_c = &man_b - &man_a;
+                (sign_c, exp_c, man_c)
+            } else {
+                // |a| == |b|
+                // +0
+                let sign_c = zero.clone();
+                let man_c = zero;
                 (sign_c, exp_c, man_c)
             }
         } else if exp_a == T::max_exp() {
@@ -161,7 +172,7 @@ fn effective_sub<T: FloatType>(
             // case 1.3: normal - normal
             if man_a < man_b {
                 // |a| < |b|
-                let sign_c = one - sign_b;
+                let sign_c = one - sign_a;
                 let mut man_c = man_b - man_a;
                 let man_diff = man_c.to_u64_digits()[0];
                 // shift=0 when clz=11([63:53])
@@ -175,7 +186,7 @@ fn effective_sub<T: FloatType>(
                 let sign_c = sign_a;
                 let mut man_c = man_a - man_b;
                 let man_diff = man_c.to_u64_digits()[0];
-                // shift=0 when clz=12([63:53])
+                // shift=0 when clz=11([63:53])
                 let shift = man_diff.leading_zeros() - (64 - T::SIG) as u32;
                 let exp_c = exp_a - shift;
                 man_c = man_c << shift;
@@ -217,13 +228,15 @@ fn effective_sub<T: FloatType>(
             if exp_a > exp_b {
                 // |a| > |b|
                 let sign_c = sign_a;
-                let exp_c = &exp_a - one;
 
                 let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
                 let mut man_c = norm_a - (norm_b >> exp_diff);
 
-                // shift for exp-1
-                man_c = man_c << 1;
+                let man_diff = man_c.to_u64_digits()[0];
+                // shift=1 when clz=11([63:53])
+                let shift = man_diff.leading_zeros() + 1 - (64 - T::SIG) as u32;
+                man_c = man_c << shift;
+                let exp_c = &exp_a - shift;
                 man_c = man_c - (&norm_bit << 1);
 
                 // remove pre shifted bit
@@ -233,12 +246,14 @@ fn effective_sub<T: FloatType>(
             } else {
                 // |a| < |b|
                 let sign_c = &one - sign_a;
-                let exp_c = &exp_b - &one;
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
                 let mut man_c = norm_b - (norm_a >> exp_diff);
 
-                // shift for exp-1
-                man_c = man_c << 1;
+                let man_diff = man_c.to_u64_digits()[0];
+                // shift=1 when clz=11([63:53])
+                let shift = man_diff.leading_zeros() + 1 - (64 - T::SIG) as u32;
+                man_c = man_c << shift;
+                let exp_c = &exp_b - shift;
                 man_c = man_c - (&norm_bit << 1);
 
                 // remove pre shifted bit
