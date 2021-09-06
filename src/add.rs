@@ -23,6 +23,7 @@ fn round(man: &BigUint) -> BigUint {
 }
 
 // right shift with the LSB sticky
+// sticky bit: reduced OR of shifted-away bits
 fn rshift_sticky(man: &BigUint, shift: u64) -> BigUint {
     let zero = 0.to_biguint().unwrap();
     let one = 1.to_biguint().unwrap();
@@ -48,7 +49,6 @@ fn effective_add<T: FloatType>(
     let three = 3.to_biguint().unwrap();
     let norm_bit = &one << (T::SIG - 1);
 
-    // now exp_a >= exp_b
     let (sign_c, exp_c, man_c) = if exp_a == exp_b {
         // case 1: exponent equals
         if exp_a == zero {
@@ -140,7 +140,6 @@ fn effective_add<T: FloatType>(
             }
 
             // rounding and remove pre shifted bits
-            println!("man_c: {:052b}", man_c);
             man_c = round(&man_c);
 
             man_c = man_c - &norm_bit;
@@ -283,7 +282,7 @@ fn effective_sub<T: FloatType>(
 
                 // right shift with sticky bit
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
-                let norm_a = rshift_sticky(&norm_b, exp_diff);
+                let norm_a = rshift_sticky(&norm_a, exp_diff);
                 let mut man_c = &norm_b - &norm_a;
 
                 let man_diff = man_c.to_u64_digits()[0];
@@ -411,6 +410,20 @@ mod tests {
                 print_float::<f64>(&soft_aminusb.to_biguint())
             );
             assert_eq!(aminusb.to_bits(), soft_aminusb.to_bits());
+
+            let bminusa = b - a;
+            let soft_bminusa = softfloat_sub(b, a);
+            println!(
+                "b-a={}({})",
+                bminusa,
+                print_float::<f64>(&bminusa.to_biguint())
+            );
+            println!(
+                "soft b-a={}({})",
+                soft_bminusa,
+                print_float::<f64>(&soft_bminusa.to_biguint())
+            );
+            assert_eq!(bminusa.to_bits(), soft_bminusa.to_bits());
         }
     }
 }
