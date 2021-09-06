@@ -369,61 +369,61 @@ mod tests {
             println!("a={}({})", a, print_float::<f64>(&a.to_biguint()));
             println!("b={}({})", b, print_float::<f64>(&b.to_biguint()));
 
-            let aplusb = a + b;
-            let soft_aplusb = softfloat_add(a, b);
+            let a_plus_b = a + b;
+            let soft_a_plus_b = softfloat_add(a, b);
             println!(
                 "a+b={}({})",
-                aplusb,
-                print_float::<f64>(&aplusb.to_biguint())
+                a_plus_b,
+                print_float::<f64>(&a_plus_b.to_biguint())
             );
             println!(
                 "soft a+b={}({})",
-                soft_aplusb,
-                print_float::<f64>(&soft_aplusb.to_biguint())
+                soft_a_plus_b,
+                print_float::<f64>(&soft_a_plus_b.to_biguint())
             );
-            assert_eq!(aplusb.to_bits(), soft_aplusb.to_bits());
+            assert_eq!(a_plus_b.to_bits(), soft_a_plus_b.to_bits());
 
-            let bplusa = b + a;
-            let soft_bplusa = softfloat_add(b, a);
+            let b_plus_a = b + a;
+            let soft_b_plus_a = softfloat_add(b, a);
             println!(
                 "b+a={}({})",
-                bplusa,
-                print_float::<f64>(&bplusa.to_biguint())
+                b_plus_a,
+                print_float::<f64>(&b_plus_a.to_biguint())
             );
             println!(
                 "soft b+a={}({})",
-                soft_bplusa,
-                print_float::<f64>(&soft_bplusa.to_biguint())
+                soft_b_plus_a,
+                print_float::<f64>(&soft_b_plus_a.to_biguint())
             );
-            assert_eq!(bplusa.to_bits(), soft_bplusa.to_bits());
+            assert_eq!(b_plus_a.to_bits(), soft_b_plus_a.to_bits());
 
-            let aminusb = a - b;
-            let soft_aminusb = softfloat_sub(a, b);
+            let a_minus_b = a - b;
+            let soft_a_minus_b = softfloat_sub(a, b);
             println!(
                 "a-b={}({})",
-                aminusb,
-                print_float::<f64>(&aminusb.to_biguint())
+                a_minus_b,
+                print_float::<f64>(&a_minus_b.to_biguint())
             );
             println!(
                 "soft a-b={}({})",
-                soft_aminusb,
-                print_float::<f64>(&soft_aminusb.to_biguint())
+                soft_a_minus_b,
+                print_float::<f64>(&soft_a_minus_b.to_biguint())
             );
-            assert_eq!(aminusb.to_bits(), soft_aminusb.to_bits());
+            assert_eq!(a_minus_b.to_bits(), soft_a_minus_b.to_bits());
 
-            let bminusa = b - a;
-            let soft_bminusa = softfloat_sub(b, a);
+            let b_minus_a = b - a;
+            let soft_b_minus_a = softfloat_sub(b, a);
             println!(
                 "b-a={}({})",
-                bminusa,
-                print_float::<f64>(&bminusa.to_biguint())
+                b_minus_a,
+                print_float::<f64>(&b_minus_a.to_biguint())
             );
             println!(
                 "soft b-a={}({})",
-                soft_bminusa,
-                print_float::<f64>(&soft_bminusa.to_biguint())
+                soft_b_minus_a,
+                print_float::<f64>(&soft_b_minus_a.to_biguint())
             );
-            assert_eq!(bminusa.to_bits(), soft_bminusa.to_bits());
+            assert_eq!(b_minus_a.to_bits(), soft_b_minus_a.to_bits());
         }
     }
 }
