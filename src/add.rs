@@ -1,6 +1,26 @@
 use crate::{extract, pack, FloatType};
 use num_bigint::{BigUint, ToBigUint};
 
+fn round(man: &BigUint) -> BigUint {
+    let one = 1.to_biguint().unwrap();
+
+    let low_bits = man.to_u64_digits().pop().unwrap_or(0) & 0b111;
+    let mut res: BigUint = man >> 3;
+    if low_bits < 0b100 {
+        // round down
+    } else if low_bits > 0b100 {
+        // round up
+        res += &one;
+    } else {
+        // round to nearest even
+        if res.bit(0) {
+            // up
+            res += &one;
+        }
+    }
+    res
+}
+
 fn effective_add<T: FloatType>(
     sign_a: BigUint,
     exp_a: BigUint,
@@ -70,47 +90,55 @@ fn effective_add<T: FloatType>(
             let mut norm_a = man_a;
             let mut norm_b = man_b;
 
-            // pre left shift by one for rounding
-            norm_a = norm_a << 1;
-            norm_b = norm_b << 1;
+            // pre left shift 3 bits for rounding
+            norm_a = norm_a << 3;
+            norm_b = norm_b << 3;
 
             let mut exp_c = if exp_a > exp_b {
                 // exp_a > exp_b
                 let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
                 if exp_b != zero {
                     // add implicit 1.0
-                    norm_b += &norm_bit << 1;
+                    norm_b += &norm_bit << 3;
                 }
-                // align
-                norm_b >>= exp_diff;
+
+                // align with sticky bit
+                if (&norm_b & ((&one << exp_diff) - &one)) != zero {
+                    norm_b >>= exp_diff;
+                    norm_b |= &one;
+                } else {
+                    norm_b >>= exp_diff;
+                }
                 exp_a
             } else {
                 // exp_a < exp_b
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
                 if exp_a != zero {
                     // add implicit 1.0
-                    norm_a += &norm_bit << 1;
+                    norm_a += &norm_bit << 3;
                 }
-                // align
-                norm_a >>= exp_diff;
+
+                // align with sticky bit
+                if (&norm_a & ((&one << exp_diff) - &one)) != zero {
+                    norm_a >>= exp_diff;
+                    norm_a |= &one;
+                } else {
+                    norm_a >>= exp_diff;
+                }
                 exp_b
             };
 
             // the bigger one is always normal
-            let mut man_c = norm_a + norm_b + (&norm_bit << 1);
+            let mut man_c = norm_a + norm_b + (&norm_bit << 3);
 
-            if man_c >= &norm_bit << 2 {
+            if man_c >= &norm_bit << 4 {
                 exp_c = exp_c + &one;
                 man_c = man_c >> 1;
             }
 
-            // round to nearest even
-            // round up when ....1 1
-            if (&man_c & &three) == three {
-                man_c = man_c + two;
-            }
-            // remove pre shifted bit
-            man_c = man_c >> 1;
+            // rounding and remove pre shifted bits
+            println!("man_c: {:052b}", man_c);
+            man_c = round(&man_c);
 
             man_c = man_c - &norm_bit;
 
@@ -207,7 +235,7 @@ fn effective_sub<T: FloatType>(
             // inf/nan
             (sign_b, exp_b, man_b)
         } else {
-            // pre shift for rounding
+            // pre shift 3 bits for rounding
             let mut norm_a = if exp_a == zero {
                 // subnormal
                 man_a.clone()
@@ -215,7 +243,7 @@ fn effective_sub<T: FloatType>(
                 // normal
                 &man_a + &norm_bit
             };
-            norm_a <<= 1;
+            norm_a <<= 3;
             let mut norm_b = if exp_b == zero {
                 // subnormal
                 man_b.clone()
@@ -223,41 +251,52 @@ fn effective_sub<T: FloatType>(
                 // normal
                 &man_b + &norm_bit
             };
-            norm_b <<= 1;
+            norm_b <<= 3;
 
             if exp_a > exp_b {
                 // |a| > |b|
                 let sign_c = sign_a;
 
+                // right shift with sticky bit
                 let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
-                let mut man_c = norm_a - (norm_b >> exp_diff);
+                let mut shifted_b = &norm_b >> exp_diff;
+                if (norm_b & ((&one << exp_diff) - &one)) != zero {
+                    shifted_b |= &one;
+                }
+                let mut man_c = &norm_a - &shifted_b;
 
                 let man_diff = man_c.to_u64_digits()[0];
-                // shift=1 when clz=11([63:53])
-                let shift = man_diff.leading_zeros() + 1 - (64 - T::SIG) as u32;
+                // shift=1 when clz=9([63:55])
+                let shift = man_diff.leading_zeros() + 3 - (64 - T::SIG) as u32;
                 man_c = man_c << shift;
                 let exp_c = &exp_a - shift;
-                man_c = man_c - (&norm_bit << 1);
+                man_c = man_c - (&norm_bit << 3);
 
-                // remove pre shifted bit
-                man_c = man_c >> 1;
+                // round pre shifted 3 bits
+                man_c = round(&man_c);
 
                 (sign_c, exp_c, man_c)
             } else {
                 // |a| < |b|
                 let sign_c = &one - sign_a;
+
+                // right shift with sticky bit
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
-                let mut man_c = norm_b - (norm_a >> exp_diff);
+                let mut shifted_a = &norm_a >> exp_diff;
+                if (norm_a & ((&one << exp_diff) - &one)) != zero {
+                    shifted_a |= &one;
+                }
+                let mut man_c = &norm_b - &shifted_a;
 
                 let man_diff = man_c.to_u64_digits()[0];
-                // shift=1 when clz=11([63:53])
-                let shift = man_diff.leading_zeros() + 1 - (64 - T::SIG) as u32;
+                // shift=1 when clz=9([63:55])
+                let shift = man_diff.leading_zeros() + 3 - (64 - T::SIG) as u32;
                 man_c = man_c << shift;
                 let exp_c = &exp_b - shift;
-                man_c = man_c - (&norm_bit << 1);
+                man_c = man_c - (&norm_bit << 3);
 
-                // remove pre shifted bit
-                man_c = man_c >> 1;
+                // round pre shifted 3 bits
+                man_c = round(&man_c);
 
                 (sign_c, exp_c, man_c)
             }
@@ -309,6 +348,9 @@ mod tests {
             (0.1, 0.2),
             (0.1, -0.2),
             (0.1, -0.1),
+            (4503599627370496.0, 0.4),
+            (4503599627370496.0, 0.5),
+            (4503599627370496.0, 0.6),
             // (1.5E+308, 1.5E+308),
             // subnormal/zero + normal
             (0.0, 0.1),
