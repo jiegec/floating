@@ -1,6 +1,7 @@
 use crate::{extract, pack, FloatType};
 use num_bigint::{BigUint, ToBigUint};
 
+// round to nearest even with 3 bits: guard, round and sticky
 fn round(man: &BigUint) -> BigUint {
     let one = 1.to_biguint().unwrap();
 
@@ -19,6 +20,18 @@ fn round(man: &BigUint) -> BigUint {
         }
     }
     res
+}
+
+// right shift with the LSB sticky
+fn rshift_sticky(man: &BigUint, shift: u64) -> BigUint {
+    let zero = 0.to_biguint().unwrap();
+    let one = 1.to_biguint().unwrap();
+
+    if (man & ((&one << shift) - &one)) != zero {
+        (man >> shift) | one
+    } else {
+        man >> shift
+    }
 }
 
 fn effective_add<T: FloatType>(
@@ -103,12 +116,7 @@ fn effective_add<T: FloatType>(
                 }
 
                 // align with sticky bit
-                if (&norm_b & ((&one << exp_diff) - &one)) != zero {
-                    norm_b >>= exp_diff;
-                    norm_b |= &one;
-                } else {
-                    norm_b >>= exp_diff;
-                }
+                norm_b = rshift_sticky(&norm_b, exp_diff);
                 exp_a
             } else {
                 // exp_a < exp_b
@@ -119,12 +127,7 @@ fn effective_add<T: FloatType>(
                 }
 
                 // align with sticky bit
-                if (&norm_a & ((&one << exp_diff) - &one)) != zero {
-                    norm_a >>= exp_diff;
-                    norm_a |= &one;
-                } else {
-                    norm_a >>= exp_diff;
-                }
+                norm_a = rshift_sticky(&norm_a, exp_diff);
                 exp_b
             };
 
@@ -222,7 +225,8 @@ fn effective_sub<T: FloatType>(
                 (sign_c, exp_c, man_c)
             } else {
                 // |a| == |b|
-                let sign_c = sign_a;
+                // res = +0 if rounding mode is not roundTowardNegative
+                let sign_c = zero.clone();
                 (sign_c, zero.clone(), zero.clone())
             }
         }
@@ -259,11 +263,8 @@ fn effective_sub<T: FloatType>(
 
                 // right shift with sticky bit
                 let exp_diff = (&exp_a - &exp_b).to_u64_digits().pop().unwrap_or(0);
-                let mut shifted_b = &norm_b >> exp_diff;
-                if (norm_b & ((&one << exp_diff) - &one)) != zero {
-                    shifted_b |= &one;
-                }
-                let mut man_c = &norm_a - &shifted_b;
+                let norm_b = rshift_sticky(&norm_b, exp_diff);
+                let mut man_c = &norm_a - &norm_b;
 
                 let man_diff = man_c.to_u64_digits()[0];
                 // shift=1 when clz=9([63:55])
@@ -282,11 +283,8 @@ fn effective_sub<T: FloatType>(
 
                 // right shift with sticky bit
                 let exp_diff = (&exp_b - &exp_a).to_u64_digits().pop().unwrap_or(0);
-                let mut shifted_a = &norm_a >> exp_diff;
-                if (norm_a & ((&one << exp_diff) - &one)) != zero {
-                    shifted_a |= &one;
-                }
-                let mut man_c = &norm_b - &shifted_a;
+                let norm_a = rshift_sticky(&norm_b, exp_diff);
+                let mut man_c = &norm_b - &norm_a;
 
                 let man_diff = man_c.to_u64_digits()[0];
                 // shift=1 when clz=9([63:55])
@@ -360,7 +358,6 @@ mod tests {
             (0.0, 1.0 / 1.0E+308),
             (0.0, 0.0),
             (-0.0, 0.0),
-            (0.0, -0.0),
             // inf/nan + inf/nan
             (f64::INFINITY, f64::NAN),
             (f64::INFINITY, -f64::NAN),
@@ -386,6 +383,20 @@ mod tests {
                 print_float::<f64>(&soft_aplusb.to_biguint())
             );
             assert_eq!(aplusb.to_bits(), soft_aplusb.to_bits());
+
+            let bplusa = b + a;
+            let soft_bplusa = softfloat_add(b, a);
+            println!(
+                "b+a={}({})",
+                bplusa,
+                print_float::<f64>(&bplusa.to_biguint())
+            );
+            println!(
+                "soft b+a={}({})",
+                soft_bplusa,
+                print_float::<f64>(&soft_bplusa.to_biguint())
+            );
+            assert_eq!(bplusa.to_bits(), soft_bplusa.to_bits());
 
             let aminusb = a - b;
             let soft_aminusb = softfloat_sub(a, b);
