@@ -16,15 +16,16 @@ fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
     let exp_in = range::<T>(num, T::EXP + T::SIG - 2, T::SIG - 1);
     let sig_in = range::<T>(num, T::SIG - 2, 0);
 
-    let is_zero_exp_in = exp_in == 0.to_biguint().unwrap();
-    let is_zero_sig_in = sig_in == 0.to_biguint().unwrap();
+    let is_zero_exp_in = exp_in == f0;
+    let is_zero_sig_in = sig_in == f0;
 
     let k = T::EXP - 1;
     let pow2k = (1 << k).to_biguint().unwrap();
     let (exp, sig) = if is_zero_exp_in && is_zero_sig_in {
-        // zeros
+        // zero
         (f0.clone(), f0.clone())
     } else if is_zero_exp_in && !is_zero_sig_in {
+        // subnormal
         let mut leading_zeros = 0u32;
         for bit in (0..T::SIG - 1).rev() {
             if sig_in.bit(bit as u64) {
@@ -61,15 +62,64 @@ fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
     format!("sign={},exp={},sig={}", sign, exp, sig)
 }
 
+fn to_flopoco<T: FloatType>(num: &BigUint) -> BigUint {
+    let f0: BigUint = 0.to_biguint().unwrap();
+    // two exn bits at the msb: 0=zero, 1=normal, 2=inf, 3=nan
+    // no subnormal numbers
+    let sign = bit::<T>(num, T::EXP + T::SIG - 1);
+    let exp_in = range::<T>(num, T::EXP + T::SIG - 2, T::SIG - 1);
+    let sig_in = range::<T>(num, T::SIG - 2, 0);
+
+    let is_zero_exp_in = exp_in == f0;
+    let is_zero_sig_in = sig_in == f0;
+
+    let k = T::EXP - 1;
+    let (exn, exp, sig) = if is_zero_exp_in && is_zero_sig_in {
+        // zero
+        (f0.clone(), f0.clone(), f0.clone())
+    } else if is_zero_exp_in && !is_zero_sig_in {
+        // subnormal
+        todo!()
+    } else if exp_in == ((1 << (T::EXP + 1)) - 1).to_biguint().unwrap() {
+        // special
+        if is_zero_sig_in {
+            // infinity
+            (2.to_biguint().unwrap(), f0.clone(), f0)
+        } else {
+            // NaN
+            (3.to_biguint().unwrap(), f0.clone(), f0)
+        }
+    } else {
+        // normal
+        (1.to_biguint().unwrap(), exp_in, sig_in)
+    };
+    (exn << (T::EXP + T::SIG + 1)) | (sign << (T::EXP + T::SIG)) | (exp << (T::SIG - 1)) | sig
+}
+
+fn print_flopoco<T: FloatType>(bits: &BigUint) -> String {
+    let exn = range::<T>(bits, T::SIG + T::EXP + 2, T::SIG + T::EXP + 1);
+    let sign = bit::<T>(bits, T::SIG + T::EXP);
+    let exp = range::<T>(bits, T::SIG + T::EXP - 1, T::SIG - 1);
+    let sig = range::<T>(bits, T::SIG - 2, 0);
+    format!("exn={},sign={},exp={},sig={}", exn, sign, exp, sig)
+}
+
 fn float_to_hex_inner<T: FloatType>(num: T) {
     let bits = num.to_biguint();
     let hardfloat = to_hardfloat::<T>(&bits);
+    let flopoco = to_flopoco::<T>(&bits);
     println!("    {}: {:#x}({})", T::NAME, bits, print_float::<T>(&bits));
     println!(
         "    h{}: {:#x}({})",
         T::NAME,
         hardfloat,
         print_hardfloat::<T>(&hardfloat)
+    );
+    println!(
+        "    fpc{}: {:#x}({})",
+        T::NAME,
+        flopoco,
+        print_flopoco::<T>(&flopoco)
     );
 }
 
