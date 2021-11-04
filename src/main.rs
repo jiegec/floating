@@ -1,5 +1,6 @@
 use anyhow;
 use floating::{bit, print_float, range, FloatType};
+use half::f16;
 use num_bigint::{BigUint, ToBigUint};
 use std::cmp::min;
 use std::env::args;
@@ -52,7 +53,7 @@ fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
         let exp = exp_in + pow2k + 1u32;
         (exp, sig_in)
     };
-    (sign << (T::EXP + T::SIG)) | (exp << (T::SIG - 1)) | sig
+    (sign << (T::EXP + T::SIG - 1)) | (exp << (T::SIG - 1)) | sig
 }
 
 fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
@@ -73,7 +74,6 @@ fn to_flopoco<T: FloatType>(num: &BigUint) -> BigUint {
     let is_zero_exp_in = exp_in == f0;
     let is_zero_sig_in = sig_in == f0;
 
-    let k = T::EXP - 1;
     let (exn, exp, sig) = if is_zero_exp_in && is_zero_sig_in {
         // zero
         (f0.clone(), f0.clone(), f0.clone())
@@ -93,13 +93,13 @@ fn to_flopoco<T: FloatType>(num: &BigUint) -> BigUint {
         // normal
         (1.to_biguint().unwrap(), exp_in, sig_in)
     };
-    (exn << (T::EXP + T::SIG + 1)) | (sign << (T::EXP + T::SIG)) | (exp << (T::SIG - 1)) | sig
+    (exn << (T::EXP + T::SIG)) | (sign << (T::EXP + T::SIG - 1)) | (exp << (T::SIG - 1)) | sig
 }
 
 fn print_flopoco<T: FloatType>(bits: &BigUint) -> String {
-    let exn = range::<T>(bits, T::SIG + T::EXP + 2, T::SIG + T::EXP + 1);
-    let sign = bit::<T>(bits, T::SIG + T::EXP);
-    let exp = range::<T>(bits, T::SIG + T::EXP - 1, T::SIG - 1);
+    let exn = range::<T>(bits, T::SIG + T::EXP + 1, T::SIG + T::EXP);
+    let sign = bit::<T>(bits, T::SIG + T::EXP - 1);
+    let exp = range::<T>(bits, T::SIG + T::EXP - 2, T::SIG - 1);
     let sig = range::<T>(bits, T::SIG - 2, 0);
     format!("exn={},sign={},exp={},sig={}", exn, sign, exp, sig)
 }
@@ -125,6 +125,7 @@ fn float_to_hex_inner<T: FloatType>(num: T) {
 
 fn float_to_hex(num: f64) {
     println!("  float -> hex:");
+    float_to_hex_inner::<f16>(f16::from_f64(num));
     float_to_hex_inner::<f32>(num as f32);
     float_to_hex_inner::<f64>(num as f64);
 }
@@ -152,8 +153,9 @@ fn hex_to_float_inner<T: FloatType>(num: &BigUint) {
 fn hex_to_float(num: &BigUint) {
     println!("  hex -> float:");
     println!("    hex: {:#x}", num);
-    hex_to_float_inner::<f64>(&num);
+    hex_to_float_inner::<f16>(&num);
     hex_to_float_inner::<f32>(&num);
+    hex_to_float_inner::<f64>(&num);
 }
 
 fn main() -> anyhow::Result<()> {

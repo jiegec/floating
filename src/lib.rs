@@ -1,3 +1,4 @@
+use half::f16;
 use num_bigint::{BigUint, ToBigUint};
 use std::fmt::Display;
 
@@ -19,6 +20,18 @@ pub trait FloatType: Display + Copy + Clone {
     }
     fn max_exp() -> BigUint {
         (1.to_biguint().unwrap() << (Self::EXP)) - 1.to_biguint().unwrap()
+    }
+}
+
+impl FloatType for f16 {
+    const EXP: usize = 5;
+    const SIG: usize = 11;
+    const NAME: &'static str = "f16";
+    fn to_biguint(self) -> BigUint {
+        self.to_bits().to_biguint().unwrap()
+    }
+    fn from_biguint(num: &BigUint) -> Self {
+        f16::from_bits(num.iter_u32_digits().next().unwrap_or(0) as u16)
     }
 }
 
