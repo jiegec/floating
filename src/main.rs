@@ -53,7 +53,7 @@ fn to_hardfloat<T: FloatType>(num: &BigUint) -> BigUint {
         let exp = exp_in + pow2k + 1u32;
         (exp, sig_in)
     };
-    (sign << (T::EXP + T::SIG - 1)) | (exp << (T::SIG - 1)) | sig
+    (sign << (T::EXP + T::SIG)) | (exp << (T::SIG - 1)) | sig
 }
 
 fn print_hardfloat<T: FloatType>(bits: &BigUint) -> String {
