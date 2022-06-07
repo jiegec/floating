@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.43"
 half = "1.8.2"
-num-bigint = "0.4.2"
+num-bigint = "0.4.3"
