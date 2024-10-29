@@ -24,7 +24,9 @@ fn App() -> Html {
         let new_input = get_value_from_input_event(input_event);
         let mut buffer = Vec::new();
         let mut cursor = Cursor::new(&mut buffer);
-        process_arg(&mut cursor, &new_input).unwrap();
+        for part in new_input.split(" ") {
+            process_arg(&mut cursor, part).unwrap();
+        }
         input.set(new_input);
         result.set(String::from_utf8_lossy(&buffer).into_owned());
     });
