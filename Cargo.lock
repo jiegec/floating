@@ -30,7 +30,16 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 name = "floating"
 version = "0.1.0"
 dependencies = [
+ "half",
+ "num-bigint",
+]
+
+[[package]]
+name = "floating-cli"
+version = "0.1.0"
+dependencies = [
  "anyhow",
+ "floating",
  "half",
  "num-bigint",
 ]
