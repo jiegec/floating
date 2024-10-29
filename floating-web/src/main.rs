@@ -31,15 +31,15 @@ fn App() -> Html {
 
     html! {
         <div>
-            {"Input:"}
+            <h1>{"Input:"}</h1>
             <br/>
             <input type="text" value={input_value} onchange={oninput} />
             <br/>
-            {"Result:"}
+            <h1>{"Result:"}</h1>
             <br/>
-            <code style="white-space: pre-line">
+            <pre>
                 {result_value}
-            </code>
+            </pre>
         </div>
     }
 }
