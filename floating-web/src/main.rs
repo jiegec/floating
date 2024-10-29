@@ -33,11 +33,12 @@ fn App() -> Html {
 
     html! {
         <div>
-            <h1>{"Input:"}</h1>
+            <h1>{"Input"}</h1>
+            {"Input decimal or hexadecimal numbers separated by spaces and press Enter:"}
             <br/>
             <input type="text" value={input_value} onchange={oninput} />
             <br/>
-            <h1>{"Result:"}</h1>
+            <h1>{"Result"}</h1>
             <br/>
             <pre>
                 {result_value}
