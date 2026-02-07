@@ -336,6 +336,29 @@ pub fn softfloat_sub<T: FloatType>(a: T, b: T) -> T {
 mod tests {
     use crate::{print_float, softfloat_add, softfloat_sub, FloatType};
 
+    // Macro for NaN-aware float comparison
+    // NaN values can have different sign bits in IEEE 754, so we only check
+    // if both are NaN rather than strict bit equality for NaN cases
+    macro_rules! assert_float_eq {
+        ($left:expr, $right:expr) => {
+            if $left.is_nan() {
+                assert!(
+                    $right.is_nan(),
+                    "Expected NaN, got {}",
+                    print_float::<f64>(&$right.to_biguint())
+                );
+            } else {
+                assert_eq!(
+                    $left.to_bits(),
+                    $right.to_bits(),
+                    "Float mismatch: {} vs {}",
+                    print_float::<f64>(&$left.to_biguint()),
+                    print_float::<f64>(&$right.to_biguint())
+                );
+            }
+        };
+    }
+
     #[test]
     fn test() {
         for (a, b) in vec![
@@ -381,7 +404,7 @@ mod tests {
                 soft_a_plus_b,
                 print_float::<f64>(&soft_a_plus_b.to_biguint())
             );
-            assert_eq!(a_plus_b.to_bits(), soft_a_plus_b.to_bits());
+            assert_float_eq!(a_plus_b, soft_a_plus_b);
 
             let b_plus_a = b + a;
             let soft_b_plus_a = softfloat_add(b, a);
@@ -395,7 +418,7 @@ mod tests {
                 soft_b_plus_a,
                 print_float::<f64>(&soft_b_plus_a.to_biguint())
             );
-            assert_eq!(b_plus_a.to_bits(), soft_b_plus_a.to_bits());
+            assert_float_eq!(b_plus_a, soft_b_plus_a);
 
             let a_minus_b = a - b;
             let soft_a_minus_b = softfloat_sub(a, b);
@@ -409,7 +432,7 @@ mod tests {
                 soft_a_minus_b,
                 print_float::<f64>(&soft_a_minus_b.to_biguint())
             );
-            assert_eq!(a_minus_b.to_bits(), soft_a_minus_b.to_bits());
+            assert_float_eq!(a_minus_b, soft_a_minus_b);
 
             let b_minus_a = b - a;
             let soft_b_minus_a = softfloat_sub(b, a);
@@ -423,7 +446,7 @@ mod tests {
                 soft_b_minus_a,
                 print_float::<f64>(&soft_b_minus_a.to_biguint())
             );
-            assert_eq!(b_minus_a.to_bits(), soft_b_minus_a.to_bits());
+            assert_float_eq!(b_minus_a, soft_b_minus_a);
         }
     }
 }
