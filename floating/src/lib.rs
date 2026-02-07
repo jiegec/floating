@@ -71,9 +71,9 @@ pub fn bit<T: FloatType>(num: &BigUint, idx: usize) -> BigUint {
 // extract (sign, exponent, mantissa)
 pub fn extract<T: FloatType>(num: &BigUint) -> (BigUint, BigUint, BigUint) {
     (
-        bit::<T>(&num, T::WIDTH - 1),
-        range::<T>(&num, T::WIDTH - 2, T::SIG - 1),
-        range::<T>(&num, T::SIG - 2, 0),
+        bit::<T>(num, T::WIDTH - 1),
+        range::<T>(num, T::WIDTH - 2, T::SIG - 1),
+        range::<T>(num, T::SIG - 2, 0),
     )
 }
 

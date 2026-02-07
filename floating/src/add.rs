@@ -85,10 +85,10 @@ fn effective_add<T: FloatType>(
             // if the lowest two bits are 0b11
             // it should be rounded up
             if (&man_c & &three) == three {
-                man_c = man_c + two;
+                man_c += two;
             }
-            man_c = man_c >> 1;
-            man_c = man_c - norm_bit;
+            man_c >>= 1;
+            man_c -= norm_bit;
             (sign_c, exp_c, man_c)
         }
     } else {
@@ -104,8 +104,8 @@ fn effective_add<T: FloatType>(
             let mut norm_b = man_b;
 
             // pre left shift 3 bits for rounding
-            norm_a = norm_a << 3;
-            norm_b = norm_b << 3;
+            norm_a <<= 3;
+            norm_b <<= 3;
 
             let mut exp_c = if exp_a > exp_b {
                 // exp_a > exp_b
@@ -135,14 +135,14 @@ fn effective_add<T: FloatType>(
             let mut man_c = norm_a + norm_b + (&norm_bit << 3);
 
             if man_c >= &norm_bit << 4 {
-                exp_c = exp_c + &one;
-                man_c = man_c >> 1;
+                exp_c += &one;
+                man_c >>= 1;
             }
 
             // rounding and remove pre shifted bits
             man_c = round(&man_c);
 
-            man_c = man_c - &norm_bit;
+            man_c -= &norm_bit;
 
             let sign_c = sign_a;
             (sign_c, exp_c, man_c)
@@ -208,7 +208,7 @@ fn effective_sub<T: FloatType>(
                 // shift=0 when clz=11([63:53])
                 let shift = man_diff.leading_zeros() - (64 - T::SIG) as u32;
                 let exp_c = exp_a - shift;
-                man_c = man_c << shift;
+                man_c <<= shift;
                 man_c -= norm_bit;
                 (sign_c, exp_c, man_c)
             } else if man_a > man_b {
@@ -219,7 +219,7 @@ fn effective_sub<T: FloatType>(
                 // shift=0 when clz=11([63:53])
                 let shift = man_diff.leading_zeros() - (64 - T::SIG) as u32;
                 let exp_c = exp_a - shift;
-                man_c = man_c << shift;
+                man_c <<= shift;
                 man_c -= norm_bit;
                 (sign_c, exp_c, man_c)
             } else {
@@ -268,9 +268,9 @@ fn effective_sub<T: FloatType>(
                 let man_diff = man_c.to_u64_digits()[0];
                 // shift=1 when clz=9([63:55])
                 let shift = man_diff.leading_zeros() + 3 - (64 - T::SIG) as u32;
-                man_c = man_c << shift;
+                man_c <<= shift;
                 let exp_c = &exp_a - shift;
-                man_c = man_c - (&norm_bit << 3);
+                man_c -= &norm_bit << 3;
 
                 // round pre shifted 3 bits
                 man_c = round(&man_c);
@@ -288,9 +288,9 @@ fn effective_sub<T: FloatType>(
                 let man_diff = man_c.to_u64_digits()[0];
                 // shift=1 when clz=9([63:55])
                 let shift = man_diff.leading_zeros() + 3 - (64 - T::SIG) as u32;
-                man_c = man_c << shift;
+                man_c <<= shift;
                 let exp_c = &exp_b - shift;
-                man_c = man_c - (&norm_bit << 3);
+                man_c -= &norm_bit << 3;
 
                 // round pre shifted 3 bits
                 man_c = round(&man_c);

@@ -1,4 +1,3 @@
-use anyhow;
 use floating_cli::process_arg;
 use std::env::args;
 

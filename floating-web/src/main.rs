@@ -15,9 +15,9 @@ fn get_value_from_input_event(e: Event) -> String {
 
 #[function_component]
 fn App() -> Html {
-    let input = use_state(|| String::new());
+    let input = use_state(String::new);
     let input_value = (*input).clone();
-    let result = use_state(|| String::new());
+    let result = use_state(String::new);
     let result_value = (*result).clone();
 
     let oninput = Callback::from(move |input_event: Event| {

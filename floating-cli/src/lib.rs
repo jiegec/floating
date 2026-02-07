@@ -1,4 +1,3 @@
-use anyhow;
 use floating::*;
 use half::f16;
 use num_bigint::BigUint;
@@ -36,7 +35,7 @@ fn float_to_hex<W: std::io::Write>(w: &mut W, num: f64) -> anyhow::Result<()> {
     writeln!(w, "  float -> hex:")?;
     float_to_hex_inner::<f16, W>(w, f16::from_f64(num))?;
     float_to_hex_inner::<f32, W>(w, num as f32)?;
-    float_to_hex_inner::<f64, W>(w, num as f64)?;
+    float_to_hex_inner::<f64, W>(w, num)?;
     Ok(())
 }
 
@@ -49,7 +48,7 @@ fn hex_to_float_inner<T: FloatType, W: std::io::Write>(
     let mut numbers = vec![];
     while offset < num_bits {
         numbers.push(T::from_biguint(&range::<T>(
-            &num,
+            num,
             min(offset + T::WIDTH, num_bits - 1),
             offset,
         )));
@@ -60,16 +59,16 @@ fn hex_to_float_inner<T: FloatType, W: std::io::Write>(
     for num in numbers.iter().rev() {
         write!(w, " {}", num)?;
     }
-    writeln!(w, "")?;
+    writeln!(w)?;
     Ok(())
 }
 
 fn hex_to_float<T: std::io::Write>(w: &mut T, num: &BigUint) -> anyhow::Result<()> {
     writeln!(w, "  hex -> float:")?;
     writeln!(w, "    hex: {:#x}", num)?;
-    hex_to_float_inner::<f16, T>(w, &num)?;
-    hex_to_float_inner::<f32, T>(w, &num)?;
-    hex_to_float_inner::<f64, T>(w, &num)?;
+    hex_to_float_inner::<f16, T>(w, num)?;
+    hex_to_float_inner::<f32, T>(w, num)?;
+    hex_to_float_inner::<f64, T>(w, num)?;
     Ok(())
 }
 
@@ -80,16 +79,14 @@ pub fn process_arg<T: std::io::Write>(w: &mut T, arg: &str) -> anyhow::Result<()
         if let Some(num) = BigUint::parse_bytes(s.as_bytes(), 16) {
             hex_to_float(w, &num)?;
         }
-    } else {
-        if let Ok(num) = arg.parse::<u64>() {
-            if let Some(num) = BigUint::parse_bytes(arg.as_bytes(), 10) {
-                hex_to_float(w, &num)?;
-            }
-            float_to_hex(w, num as f64)?;
-        } else {
-            let num = arg.parse::<f64>()?;
-            float_to_hex(w, num)?;
+    } else if let Ok(num) = arg.parse::<u64>() {
+        if let Some(num) = BigUint::parse_bytes(arg.as_bytes(), 10) {
+            hex_to_float(w, &num)?;
         }
+        float_to_hex(w, num as f64)?;
+    } else {
+        let num = arg.parse::<f64>()?;
+        float_to_hex(w, num)?;
     };
     Ok(())
 }
