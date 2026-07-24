@@ -9,4 +9,4 @@ edition = "2021"
 floating = { path = "../floating" }
 anyhow = "1.0.43"
 half = "2.5.0"
-num-bigint = "0.4.3"
+num-bigint = "0.5.1"
