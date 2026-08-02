@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 floating = { path = "../floating" }
-anyhow = "1.0.43"
-half = "2.5.0"
+anyhow = "1.0.104"
+half = "2.7.1"
 num-bigint = "0.5.1"

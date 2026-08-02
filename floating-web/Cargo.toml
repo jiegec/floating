@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 floating = { path = "../floating" }
 floating-cli = { path = "../floating-cli" }
-wasm-bindgen = "0.2.95"
-web-sys = "0.3.72"
+wasm-bindgen = "0.2.126"
+web-sys = "0.3.103"
 yew = { version = "0.23.0", features = ["csr"] }
